@@ -1,0 +1,5 @@
+# SAATHI node (M2) — Python deps for node/linux/publisher.py
+# Pinned to the versions installed + verified on Divya's laptop (2026-07-13).
+# Install:  python -m pip install -r node/requirements.txt
+paho-mqtt==2.1.0   # MQTT client — publishes telemetry/events per CONTRACTS §1
+pyserial==3.5      # only needed for --serial COMx (reads the real MQ-2 over serial)
