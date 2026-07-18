@@ -1,0 +1,25 @@
+# --- python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# --- environments ---
+venv/
+hub/venv/
+.env
+
+# --- large / generated artifacts (never committed) ---
+hub/models/
+data/
+logs/
+
+# --- editor / OS ---
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# --- internal docs & planning (team-local; never pushed to the public code repo) ---
+*.md
+docs/
