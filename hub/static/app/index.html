@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#101418">
+  <title>SAATHI</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="reconnect-bar" class="reconnect-bar hidden">Reconnecting…</div>
+
+  <header class="topbar">
+    <h1>SAATHI</h1>
+    <div class="topbar-right">
+      <span id="net-indicator" class="pill pill-off" title="Internet">offline</span>
+      <span id="node-indicator" class="pill pill-off" title="Sensor node">node</span>
+    </div>
+  </header>
+
+  <main>
+    <!-- Home tab -->
+    <section id="tab-home" class="tab">
+      <div class="ring-wrap">
+        <div id="status-ring" class="ring ring-ok">
+          <span id="ring-label">ALL OK</span>
+        </div>
+      </div>
+      <p id="last-alert" class="last-alert hidden"></p>
+      <div class="tiles">
+        <div class="tile"><span class="tile-label">Gas</span><span id="tile-gas" class="tile-value">–</span></div>
+        <div class="tile"><span class="tile-label">Temp</span><span id="tile-temp" class="tile-value">–</span></div>
+        <div class="tile"><span class="tile-label">Motion</span><span id="tile-motion" class="tile-value">–</span></div>
+        <div class="tile"><span class="tile-label">Node</span><span id="tile-node" class="tile-value">–</span></div>
+      </div>
+      <div class="guardian-card">
+        <button id="guardian-btn" class="btn btn-wide">Arm guardian mode</button>
+        <p id="guardian-hint" class="guardian-hint">One tap arms strong vibration
+          while an alert is active. Keep SAATHI open — the browser only vibrates
+          while the app is on screen.</p>
+      </div>
+    </section>
+
+    <!-- Alerts tab -->
+    <section id="tab-alerts" class="tab hidden">
+      <ul id="alert-list" class="alert-list"></ul>
+      <p id="alerts-empty" class="empty-copy">No alerts — all quiet. 🌿</p>
+    </section>
+
+    <!-- More tab -->
+    <section id="tab-more" class="tab hidden">
+      <button id="digest-btn" class="btn btn-wide">Generate digest</button>
+      <div id="digest-card" class="digest-card hidden">
+        <div class="digest-head">
+          <span>Daily digest</span>
+          <span id="digest-engine" class="badge"></span>
+        </div>
+        <p id="digest-text"></p>
+      </div>
+    </section>
+  </main>
+
+  <nav class="tabbar">
+    <button class="tabbtn active" data-tab="home">Home</button>
+    <button class="tabbtn" data-tab="alerts">Alerts<span id="alert-dot" class="dot hidden"></span></button>
+    <button class="tabbtn" data-tab="more">More</button>
+  </nav>
+
+  <!-- Full-screen active-alert overlay -->
+  <div id="overlay" class="overlay hidden">
+    <div class="overlay-card">
+      <div id="overlay-icon" class="overlay-icon">⚠️</div>
+      <h2 id="overlay-title"></h2>
+      <p id="overlay-message"></p>
+      <table class="facts" id="overlay-facts"></table>
+      <span id="overlay-synthetic" class="badge badge-synth hidden">SYNTHETIC</span>
+      <button id="ack-btn" class="btn btn-ack">Acknowledge</button>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>

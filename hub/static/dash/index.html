@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SAATHI — Dashboard</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="offline-banner" class="offline-banner hidden">
+    ⚡ OFFLINE — every AI decision on this screen is running locally on this machine
+  </div>
+
+  <header class="head">
+    <h1>SAATHI <span class="sub">live dashboard</span></h1>
+    <div class="head-right">
+      <span id="ep-badge" class="chip chip-ep">EP: CPU</span>
+      <span id="ws-state" class="chip chip-down">WS: connecting…</span>
+    </div>
+  </header>
+
+  <main class="grid">
+    <!-- (a) event ticker -->
+    <section class="panel panel-ticker">
+      <h2>Event ticker</h2>
+      <ul id="ticker" class="ticker"></ul>
+    </section>
+
+    <!-- (b) skeleton canvas + camera state -->
+    <section class="panel panel-skel">
+      <div class="skel-head">
+        <h2>Vision</h2>
+        <span id="camera-badge" class="chip chip-sleep">😴 SLEEPING</span>
+        <span id="pose-fps" class="metric-inline"></span>
+      </div>
+      <canvas id="skeleton" width="480" height="360"></canvas>
+      <p id="skel-caption" class="caption">
+        fixture pose — live keypoints stream here when vision wakes (camera stays
+        OFF while sleeping: that's the privacy story)
+      </p>
+    </section>
+
+    <!-- (c) health strip + (d) metrics -->
+    <aside class="panel panel-side">
+      <h2>Subsystems</h2>
+      <div id="health-strip" class="health-strip"></div>
+      <h2>Metrics</h2>
+      <div class="metrics">
+        <div class="metric"><span class="metric-label">pose</span><span id="m-pose">–</span></div>
+        <div class="metric"><span class="metric-label">asr</span><span id="m-asr">–</span></div>
+        <div class="metric"><span class="metric-label">llm</span><span id="m-llm">–</span></div>
+      </div>
+    </aside>
+  </main>
+
+  <!-- §26 demo panel — hidden until 'D' is pressed; everything it fires is SYNTHETIC -->
+  <div id="demo-panel" class="demo-panel hidden">
+    <span class="badge-synth">SYNTHETIC</span>
+    <button data-scenario="gas">Gas leak</button>
+    <button data-scenario="fall">Fall</button>
+    <button data-scenario="help">Help call</button>
+  </div>
+
+  <script src="skeleton.js"></script>
+  <script src="dash.js"></script>
+</body>
+</html>

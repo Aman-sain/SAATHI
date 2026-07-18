@@ -1,0 +1,13 @@
+{
+  "name": "SAATHI",
+  "short_name": "SAATHI",
+  "description": "Privacy-first offline AI guardian — caregiver companion",
+  "start_url": "/app/",
+  "scope": "/app/",
+  "display": "standalone",
+  "background_color": "#101418",
+  "theme_color": "#101418",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}
