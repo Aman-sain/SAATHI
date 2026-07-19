@@ -1,0 +1,104 @@
+# SAATHI - Start All Services  (Aman's reference draft — restored 2026-07-16)
+# Owned by: Aman (Infrastructure & Networking)
+#
+# NOTE: the CANONICAL team launcher is scripts\start_all.ps1 — it carries the A2
+# fixes (banner IP from .env, /api/health gate, dup-hub guard) plus ntfy + llama.
+# Use that one for demos. This copy is kept in DevopsTasks/ for Aman's reference
+# and does NOT affect, and is not used by, anything under scripts/.
+# Run from repo root: powershell -ExecutionPolicy Bypass -File DevopsTasks\start_all.ps1
+#
+# What this script does:
+#   1. Validates .env exists and reads config
+#   2. Checks/starts Mosquitto broker
+#   3. Starts the FastAPI Hub
+#   4. Prints the caregiver phone URL and instructions
+
+$ErrorActionPreference = "Stop"
+$RepoRoot = Split-Path -Parent $PSScriptRoot
+Set-Location $RepoRoot
+
+Write-Host ""
+Write-Host "============================================" -ForegroundColor Cyan
+Write-Host "  SAATHI - Start All Services              " -ForegroundColor Cyan
+Write-Host "============================================" -ForegroundColor Cyan
+Write-Host ""
+
+# --- 1. Check .env exists ---
+$EnvFile = Join-Path $RepoRoot ".env"
+if (-not (Test-Path $EnvFile)) {
+    Write-Host "ERROR: .env file not found." -ForegroundColor Red
+    Write-Host "  Run: Copy-Item .env.example .env" -ForegroundColor Yellow
+    Write-Host "  Then edit .env and set HUB_LAN_IP to your PC's hotspot IP." -ForegroundColor Yellow
+    exit 1
+}
+
+# --- 2. Read HUB_LAN_IP and HTTP_PORT from .env ---
+$HubLanIp = "192.168.137.1"  # default fallback
+$HttpPort  = "8000"           # default fallback
+foreach ($line in Get-Content $EnvFile) {
+    if ($line -match "^\s*HUB_LAN_IP\s*=\s*(.+)") { $HubLanIp = $Matches[1].Trim() }
+    if ($line -match "^\s*HTTP_PORT\s*=\s*(.+)")   { $HttpPort  = $Matches[1].Trim() }
+}
+
+# --- 3. Check venv exists ---
+$VenvPy = Join-Path $RepoRoot "hub\venv\Scripts\python.exe"
+if (-not (Test-Path $VenvPy)) {
+    Write-Host "ERROR: Python venv not found at hub\venv" -ForegroundColor Red
+    Write-Host "  Run setup first: powershell -ExecutionPolicy Bypass -File scripts\setup_hub.ps1 -MaxPhase 3" -ForegroundColor Yellow
+    exit 1
+}
+Write-Host "[OK] Python venv found" -ForegroundColor Green
+
+# --- 4. Check / Start Mosquitto ---
+Write-Host ""
+Write-Host "Checking Mosquitto MQTT broker..." -ForegroundColor White
+
+$MosqProc = Get-Process -Name "mosquitto" -ErrorAction SilentlyContinue
+if ($null -ne $MosqProc) {
+    Write-Host "[OK] Mosquitto is already running (PID $($MosqProc.Id))" -ForegroundColor Green
+} else {
+    $MosqCmd = Get-Command mosquitto -ErrorAction SilentlyContinue
+    if ($null -eq $MosqCmd) {
+        Write-Host "[WARN] Mosquitto not found on PATH." -ForegroundColor Yellow
+        Write-Host "  Install from: https://mosquitto.org/download/" -ForegroundColor Yellow
+        Write-Host "  The hub will still start but MQTT ingest will retry with backoff." -ForegroundColor Yellow
+    } else {
+        Write-Host "Starting Mosquitto..." -ForegroundColor White
+        # Run mosquitto in a new hidden window so it doesn't block this terminal
+        Start-Process -FilePath "mosquitto" -WindowStyle Hidden
+        Start-Sleep -Seconds 2
+        $MosqProc = Get-Process -Name "mosquitto" -ErrorAction SilentlyContinue
+        if ($null -ne $MosqProc) {
+            Write-Host "[OK] Mosquitto started (PID $($MosqProc.Id))" -ForegroundColor Green
+        } else {
+            Write-Host "[WARN] Mosquitto may have failed to start. Check manually." -ForegroundColor Yellow
+        }
+    }
+}
+
+# --- 5. Start the FastAPI Hub ---
+Write-Host ""
+Write-Host "Starting SAATHI Hub (FastAPI + Uvicorn)..." -ForegroundColor White
+Write-Host "  Port : $HttpPort" -ForegroundColor DarkGray
+Write-Host "  DB   : data\saathi.db" -ForegroundColor DarkGray
+Write-Host "  Logs : logs\hub.log" -ForegroundColor DarkGray
+Write-Host ""
+
+# Print phone URL BEFORE starting (so it's visible even if console fills with logs)
+Write-Host "============================================" -ForegroundColor Green
+Write-Host "  CAREGIVER PHONE URL:" -ForegroundColor Green
+Write-Host "  http://${HubLanIp}:${HttpPort}/" -ForegroundColor Yellow
+Write-Host ""
+Write-Host "  JUDGE DASHBOARD:" -ForegroundColor Green
+Write-Host "  http://${HubLanIp}:${HttpPort}/dash" -ForegroundColor Yellow
+Write-Host "============================================" -ForegroundColor Green
+Write-Host ""
+Write-Host "  Connect phone to the PC hotspot Wi-Fi first." -ForegroundColor Cyan
+Write-Host "  Then open the Caregiver URL in the phone browser." -ForegroundColor Cyan
+Write-Host ""
+Write-Host "  Press Ctrl+C to stop the hub." -ForegroundColor DarkGray
+Write-Host ""
+
+# Launch uvicorn (blocking — hub runs in this terminal window)
+& $VenvPy -m uvicorn app.main:create_app --factory --app-dir hub `
+    --host 0.0.0.0 --port $HttpPort --log-level info
