@@ -4,13 +4,17 @@ import json, time
 
 # ---- config ----------------------------------------------------------------
 NODE_ID     = "node1"
-BROKER_HOST = ""            # "" = print-only. Stage B: hub laptop IP
+BROKER_HOST = "192.168.137.1"   # hub laptop on OUR hotspot (contract §2 / HARDWARE §2);
+                                # "" = print-only bench mode
 BROKER_PORT = 1883
 INTERVAL_S  = 2.0
 FW          = "unoq-1.0"
 
-MOTION_ENABLED = True       # DEMO = False: live motion defers the hub's escalation
-                            # and would suppress the phone page (scope-lock 2026-07-14)
+MOTION_ENABLED = False      # DEMO = False: live motion defers the hub's escalation
+                            # and would suppress the phone page (scope-lock 2026-07-14).
+                            # Bench-confirmed 2026-07-19: PIR saw the operator and the
+                            # hub cancelled the 30 s clock ("t-esc cancelled
+                            # reason=motion near node") — no page. Keep False for demo.
 
 # ---- calibration (map RAW hardware range -> contract 0..1) -----------------
 # THIS rig, 2026-07-19: clean-air baseline ~60 raw; open-air waft peaked ~650.
@@ -20,7 +24,13 @@ SND_FULL = 60.0     # peak-to-peak that counts as sound_rms=1.0 (clap ~37 observ
 def norm(raw, full):
     return max(0.0, min(1.0, raw / full))
 
-GAS_HIGH, GAS_CRIT, LOUD, REARM = 0.35, 0.70, 0.60, 0.05   # contract-shared
+# Bench evidence 2026-07-19 (THIS rig, dividers in): clean air ~0.087 norm
+# (raw ~87), strongest open-air waft ~0.65 norm (raw ~650) — so the old 0.70
+# crit default sat ABOVE the sensor's max and could never fire.
+# HIGH 0.40: margin over warm-up drift; re-arms at 0.40-0.05=0.35, deliberately
+#            equal to the hub's resolve line (GAS_WARN=0.35).
+# CRIT 0.55: reachable with ~0.10 headroom under the 0.65 max; re-arms below 0.50.
+GAS_HIGH, GAS_CRIT, LOUD, REARM = 0.40, 0.55, 0.60, 0.05
 TEMP_FALLBACK = 31.5
 
 # ---- optional MQTT ----------------------------------------------------------
@@ -69,6 +79,7 @@ def loop():
     snd_pp  = Bridge.call("read_sound")
     motion  = bool(Bridge.call("read_pir")) if MOTION_ENABLED else False
     temp    = Bridge.call("read_temp")
+    dht_err = Bridge.call("read_dht_err")   # 0 = OK; -91 wiring, -92 timing, -93 checksum
 
     gas_norm  = round(norm(gas_raw, GAS_FULL), 3)
     sound_rms = round(norm(snd_pp, SND_FULL), 3)
@@ -80,7 +91,8 @@ def loop():
                "motion": motion, "sound_rms": sound_rms, "fw": FW}
     print(f"[node] gas_raw={gas_raw} gas_norm={gas_norm:.3f} "
           f"sound={sound_rms:.3f} motion={motion} temp={temp_c}"
-          f"{'' if temp_ok else f' (placeholder, dht_code={temp})'}")
+          f"{'' if temp_ok else ' (placeholder — no valid DHT read yet)'}"
+          f"{f' dht_err={dht_err}' if dht_err else ''}")
     if client:
         client.publish(T_TOPIC, json.dumps(payload))
 
