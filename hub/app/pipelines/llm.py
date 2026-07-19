@@ -48,6 +48,7 @@ SYSTEM_DIGEST = (
 _ACTIVE_STATES = ("OPEN", "ANNOUNCED", "ESCALATED")  # duplicated on purpose, see notify/remote.py
 _ATTEMPT_CAP = 100
 _MAX_PENDING = 2  # §11.4: queue depth 2, older requests dropped
+_DIGEST_TIMEOUT_S = 30.0  # route-5 summarize only; alert upgrades keep llm_timeout_s
 
 
 def _validate(text: str | None, max_chars: int) -> str | None:
@@ -130,12 +131,19 @@ class LlmClient:
         return _validate(text, max_chars=300)
 
     async def summarize(self, events: list[dict]) -> str | None:
-        text = await self._chat(SYSTEM_DIGEST, json.dumps(events), max_tokens=256)
+        # On-demand digest (route 5), NOT the emergency upgrade path: a 5-8
+        # sentence answer decodes for longer than llm_timeout_s allows (the 6 s
+        # default is tuned so alert upgrades fail fast to templates, §6.11).
+        # Non-streaming llama-server answers only when done, so the digest gets
+        # its own budget; measured ~8-12 s on the event PC's CPU EP.
+        text = await self._chat(SYSTEM_DIGEST, json.dumps(events), max_tokens=256,
+                                timeout_s=_DIGEST_TIMEOUT_S)
         return _validate(text, max_chars=1200)
 
     # --- transport ---
 
-    async def _chat(self, system: str, user: str, max_tokens: int) -> str | None:
+    async def _chat(self, system: str, user: str, max_tokens: int,
+                    timeout_s: float | None = None) -> str | None:
         if self._client is None:
             return None
         if self._pending >= _MAX_PENDING:
@@ -158,6 +166,10 @@ class LlmClient:
                                 "temperature": 0.3,
                                 "max_tokens": max_tokens,
                             },
+                            # httpx trap: timeout=None means NO timeout, not the
+                            # client default — the sentinel keeps llm_timeout_s
+                            timeout=(timeout_s if timeout_s is not None
+                                     else httpx.USE_CLIENT_DEFAULT),
                         )
                         resp.raise_for_status()
                         text = resp.json()["choices"][0]["message"]["content"]

@@ -193,3 +193,56 @@ def test_events_since_ts_filter(tmp_path):
         assert [e["type"] for e in events] == ["GAS_HIGH"]
 
         assert client.get("/api/events?limit=-1").status_code == 422
+
+
+# --- contract #5: POST /api/digest/generate ---
+
+
+def _digest_settings(tmp_path) -> Settings:
+    # mock_llm=True: dev machines (and the AI PC) run a REAL llama server on
+    # 8080 — without this the local-llm tier would answer and the asserted
+    # engine would depend on which machine runs the tests. mock_cloud defaults
+    # ON and the cloud trio to placeholders, so the chain lands on "template"
+    # deterministically everywhere.
+    return Settings(
+        _env_file=None, db_path=tmp_path / "saathi.db", log_dir=tmp_path / "logs",
+        mqtt_port=1, models_dir=tmp_path, mock_llm=True,
+    )
+
+
+def test_digest_template_engine_counts_today_and_persists(tmp_path):
+    import time as _time
+
+    app = create_app(_digest_settings(tmp_path))
+    with TestClient(app) as client:
+        now = _time.time()
+        for typ in ("GAS_HIGH", "GAS_HIGH", "LOUD_NOISE"):
+            app.state.repo.insert_event(ts=now, source="node1", type=typ)
+
+        body = client.post("/api/digest/generate", json={}).json()
+        digest = body["digest"]
+        assert digest["engine"] == "template"
+        assert digest["date"] == _time.strftime("%Y-%m-%d")
+        assert digest["text"].startswith("3 event(s) on")
+
+        app.state.db.flush()
+        rows = app.state.db.query("SELECT date, engine FROM digests")
+        assert [(r["date"], r["engine"]) for r in rows] == [(digest["date"], "template")]
+
+
+def test_digest_day_window_excludes_other_days(tmp_path):
+    import time as _time
+
+    app = create_app(_digest_settings(tmp_path))
+    with TestClient(app) as client:
+        app.state.repo.insert_event(ts=5.0, source="node1", type="GAS_HIGH")  # 1970
+        body = client.post("/api/digest/generate", json={}).json()
+    assert body["digest"]["text"] == f"No events recorded for {_time.strftime('%Y-%m-%d')}."
+
+
+def test_digest_bad_date_uses_error_schema(tmp_path):
+    with TestClient(create_app(_digest_settings(tmp_path))) as client:
+        # regex-shaped but not a calendar date — exercises the strptime guard
+        resp = client.post("/api/digest/generate", json={"date": "2026-13-99"})
+    assert resp.status_code == 422
+    assert resp.json()["error"]["code"] == "VALIDATION_ERROR"
