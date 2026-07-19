@@ -1,9 +1,11 @@
-"""§9 REST endpoints — thin: read state, serialize (§5). Phase 3 ships routes
-2–4, 6, 8 (8 lives in demo.py); route 5 (digest) lands with cloud in Phase 8,
-route 7 (check-in audio) is a NICE-TO-HAVE.
+"""§9 REST endpoints — thin: read state, serialize (§5). Phase 3 shipped routes
+2–4, 6, 8 (8 lives in demo.py); route 5 (digest) ships here with cloud (Phase
+8/F3); route 7 (check-in audio) is a NICE-TO-HAVE.
 
 Routes are sync `def` on purpose: they may block briefly on db.flush()
-(read-your-write), and FastAPI runs sync routes on the threadpool.
+(read-your-write), and FastAPI runs sync routes on the threadpool. The two
+exceptions are async: ack (must cancel timers ON the loop) and digest/generate
+(awaits the cloud→local→template chain + WS broadcast).
 """
 
 from __future__ import annotations
@@ -13,8 +15,10 @@ import time
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query, Request
-from pydantic import BaseModel
+from fastapi.encoders import jsonable_encoder
+from pydantic import BaseModel, Field
 
+from app.cloud import digest as cloud_digest
 from app.domain import Alert, StatusResponse
 
 log = logging.getLogger("api")
@@ -105,3 +109,52 @@ def list_events(
 ) -> dict[str, Any]:
     request.app.state.db.flush()
     return {"events": request.app.state.repo.list_events(since_ts=since_ts, limit=limit)}
+
+
+class DigestBody(BaseModel):
+    date: str | None = Field(default=None, pattern=r"^\d{4}-\d{2}-\d{2}$")
+
+
+@router.post("/digest/generate")
+async def generate_digest(request: Request, body: DigestBody | None = None) -> dict[str, Any]:
+    """Contract #2 route 5 (Phase 8/F3): on-demand caregiver digest, OPTIONAL
+    subsystem — cloud→local→template per §15, never on the emergency path.
+    async on purpose: awaits the engine chain and broadcasts on the loop-affine
+    WS managers. The chain itself never raises for reachability (§16), so the
+    contract's 503 covers only a genuinely unexpected engine failure."""
+    app = request.app
+    day = body.date if body and body.date else time.strftime("%Y-%m-%d")
+    try:
+        start = time.mktime(time.strptime(day, "%Y-%m-%d"))
+    except ValueError:
+        raise HTTPException(
+            status_code=422,
+            detail={"code": "VALIDATION_ERROR", "message": f"date: {day} is not a calendar date"},
+        )
+    app.state.db.flush()  # event writes are queued; the digest must see today
+    events = [
+        # "time" spares the LLM tiers from misreading epoch ts as clock time
+        # (observed: a digest citing "14:40" for a 10:40 event); template ignores it
+        {**e, "time": time.strftime("%H:%M", time.localtime(e["ts"]))}
+        for e in app.state.repo.list_events(since_ts=start, limit=1000)
+        if e["ts"] < start + 86400.0
+    ]
+    try:
+        digest = await cloud_digest.generate_digest(
+            app.state.settings, events, day, local_llm=app.state.llm
+        )
+    except Exception:
+        log.exception("digest generation failed date=%s", day)
+        raise HTTPException(
+            status_code=503,
+            detail={"code": "DIGEST_UNAVAILABLE", "message": "all digest engines failed"},
+        )
+    app.state.repo.insert_digest(
+        date=digest.date, text=digest.text, engine=digest.engine, created_ts=digest.created_ts
+    )
+    message = {"type": "digest", "digest": jsonable_encoder(digest)}
+    await app.state.ws.caregiver.broadcast(message)
+    await app.state.ws.dashboard.broadcast(message)
+    log.info("digest generated date=%s engine=%s events=%d chars=%d",
+             digest.date, digest.engine, len(events), len(digest.text))
+    return {"digest": digest.model_dump()}
