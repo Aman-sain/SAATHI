@@ -118,6 +118,17 @@ async def generate_digest(
     main.py's startup/shutdown — nothing beyond the one route-handler call
     above is needed to use this.
     """
+    # Empty day: nothing to summarize — asking an LLM yields meta-replies
+    # ("please provide the event log", observed live on Cloud AI 100
+    # 2026-07-19 right after a demo_reset). Template answers honestly.
+    if not events:
+        return Digest(
+            date=date,
+            text=_template_digest(date, events),
+            engine="template",
+            created_ts=time.time(),
+        )
+
     text = _validate(await _call_cloud(settings, events, transport=transport))
     if text is not None:
         return Digest(date=date, text=text, engine="cloud-ai-100", created_ts=time.time())
