@@ -260,6 +260,10 @@ async def lifespan(app: FastAPI):
 
     if not settings.mock_cloud and not settings.cloud_configured:
         log.warning("cloud trio unset — cloud engine disabled (§15)")
+    elif not settings.mock_cloud:
+        # trio present: yellow until a digest actually returns from the cloud —
+        # "up" is earned by a real call (routes.py), never claimed (§26)
+        health.set("cloud", "degraded")
     log.info(
         "hub up http_port=%s db=%s ep=%s", settings.http_port, settings.db_file, settings.ep
     )

@@ -157,4 +157,8 @@ async def generate_digest(request: Request, body: DigestBody | None = None) -> d
     await app.state.ws.dashboard.broadcast(message)
     log.info("digest generated date=%s engine=%s events=%d chars=%d",
              digest.date, digest.engine, len(events), len(digest.text))
+    if digest.engine == "cloud-ai-100":
+        app.state.health.set("cloud", "up")
+    elif not app.state.settings.mock_cloud and app.state.settings.cloud_configured:
+        app.state.health.set("cloud", "degraded")  # configured but this call fell back
     return {"digest": digest.model_dump()}

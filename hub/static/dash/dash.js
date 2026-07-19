@@ -51,7 +51,9 @@ function addTickerLine(ev) {
   while (ticker.children.length > TICKER_MAX) ticker.lastChild.remove();
 }
 
-const CHIP_ORDER = ["node", "broker", "vision", "asr", "llm", "cloud", "internet"];
+// "vision" dropped 2026-07-19 (Divya-directed): stretch-only subsystem, a
+// permanent red chip reads as broken to judges
+const CHIP_ORDER = ["node", "broker", "asr", "llm", "cloud", "internet"];
 
 function applyStatus(s) {
   const strip = $("health-strip");

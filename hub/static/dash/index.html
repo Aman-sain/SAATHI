@@ -26,8 +26,20 @@
       <ul id="ticker" class="ticker"></ul>
     </section>
 
-    <!-- (b) skeleton canvas + camera state -->
-    <section class="panel panel-skel">
+    <!-- voice phrase card (Divya 2026-07-19): list ONLY phrases verified to
+         match this build's EN whisper — unverified Hindi misleads the elder -->
+    <section class="panel">
+      <h2>Voice phrases</h2>
+      <p>Call for help: <strong>“help, help, help”</strong></p>
+      <p>All-clear during a warning: <strong>“I'm fine”</strong> · <strong>“I am fine”</strong> · <strong>“I am okay”</strong></p>
+      <p class="caption">madad / bachao / theek hoon are configured but pending
+      venue verification against the English ASR model — verify before telling
+      the elder to rely on them.</p>
+    </section>
+
+    <!-- (b) skeleton canvas + camera state — vision is STRETCH-ONLY and not
+         integrated (health: down); hidden so judges don't read it as broken -->
+    <section class="panel panel-skel" hidden>
       <div class="skel-head">
         <h2>Vision</h2>
         <span id="camera-badge" class="chip chip-sleep">😴 SLEEPING</span>
@@ -46,7 +58,7 @@
       <div id="health-strip" class="health-strip"></div>
       <h2>Metrics</h2>
       <div class="metrics">
-        <div class="metric"><span class="metric-label">pose</span><span id="m-pose">–</span></div>
+        <div class="metric" hidden><span class="metric-label">pose</span><span id="m-pose">–</span></div>
         <div class="metric"><span class="metric-label">asr</span><span id="m-asr">–</span></div>
         <div class="metric"><span class="metric-label">llm</span><span id="m-llm">–</span></div>
       </div>

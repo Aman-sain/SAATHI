@@ -47,6 +47,9 @@ CHUNK_S = 3.0              # §11.2 chunk length…
 THROTTLED_CHUNK_S = 5.0    # …self-throttles to this when transcription is slow
 CHUNK_BUDGET_S = 2.5       # §11.2: one chunk must transcribe inside this on CPU
 VAD_RMS = 0.010            # energy gate: near-silent chunks never reach whisper
+OVERLAP_S = 0.8            # tail carried into the next chunk: a keyword that
+                           # straddles a chunk cut is otherwise lost in both
+                           # halves (~1-in-6 odds at 3 s chunks, bench 07-19)
 
 # whisper front end (fixed by the export: encoder input is [1, 80, 3000])
 N_FFT = 400
@@ -318,7 +321,9 @@ class AsrPipeline:
             return
         chunk = np.concatenate(self._buf)
         self._buf.clear()
-        self._buffered = 0
+        tail = chunk[-int(OVERLAP_S * SAMPLE_RATE):]
+        self._buf.append(tail)
+        self._buffered = len(tail)
         try:
             self._chunks.put_nowait(chunk)
         except queue.Full:
